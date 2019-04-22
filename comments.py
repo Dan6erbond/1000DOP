@@ -36,16 +36,16 @@ def read_comments():
     date_started = datetime.datetime.utcnow()
     while True:
         try:
-            file = open("reddit_1000DOP_comment-stream.txt")
+            file = open("comments.txt")
             content = file.read()
             file.close()
-            for comment in subreddit.stream.comments():                    
+            for comment in subreddit.stream.comments():
                 in_daily_thread = "Daily" in comment.submission.link_flair_text
                 parent_comment = "t3" in comment.parent_id
                 # new = datetime.datetime.utcfromtimestamp(comment.created_utc) > date_started
-                    
+
                 if comment is not None and comment.author is not None and comment.id not in content and in_daily_thread and parent_comment: # and new:
-                    file = open("reddit_1000DOP_comment-stream.txt", "a")
+                    file = open("comments.txt", "a")
                     print(comment.id)
                     file.write(comment.id + "\n")
                     file.close()
@@ -89,12 +89,12 @@ def read_comments():
                         reply = comment.reply("Hey there! Looks like you're not using our standard flair format which means I can't log your days. Send me a PM [here](https://www.reddit.com/message/compose/?to=1000DOP-Bot&subject=flair) with the contents being the emoji and days you want as part of your flair and I'll fix that for you! Make sure you don't request a flair with more days than you've already logged. Example: '\U0001F3B5 12'\n\nI am a bot and this action was performed automatically. Please contact [my creator](https://www.reddit.com/message/compose/?to=Dan6erbond&subject=1000DOP-Bot) if you have any questions or concerns.")
                         comment.mod.distinguish()
                         print("Replied to {}.".format(comment.author.name))
-                    
+
         except Exception as e:
             date_started = datetime.datetime.utcnow()
             print("{}: {}".format(type(e), e))
-            sleep(30)
-        '''                                    
+            sleep(3)
+        '''
         except ConnectionError as e:
             date_started = datetime.datetime.utcnow()
             print("{}: {}".format(type(e), e)
@@ -117,7 +117,7 @@ def read_comments():
 
 def get_template_id(day):
     template_id = "109a0770-23e3-11e9-82ff-0ed95a9c69a0"
-    
+
     if day > 100:
         template_id = "bb98a602-1daf-11e9-8a1f-0e6585833b84"
     if day > 250:
@@ -187,5 +187,5 @@ def reward(day):
         # create post
         # award gold
 '''
-        
+
 read_comments()
