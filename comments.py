@@ -1,8 +1,8 @@
 import praw
-import datetime
 import sys
-# from requests.exceptions import ConnectionError, HTTPError
+import re
 from time import sleep
+from datetime import datetime
 
 reddit = praw.Reddit("1000DOP")
 subreddit = reddit.subreddit("1000DaysOfPractice")
@@ -33,23 +33,18 @@ motivational_messages = ["We may encounter many defeats but we must not be defea
 motivational_messages_keywords = ["give up"]
 
 def read_comments():
-    date_started = datetime.datetime.utcnow()
+    date_started = datetime.utcnow()
     while True:
         try:
             file = open("comments.txt")
             content = file.read()
             file.close()
             for comment in subreddit.stream.comments():
-                in_daily_thread = "Daily" in comment.submission.link_flair_text
+                in_daily_thread = "Daily" in comment.submission.link_flair_text if comment.submission.link_flair_text is not None else False
                 parent_comment = "t3" in comment.parent_id
-                # new = datetime.datetime.utcfromtimestamp(comment.created_utc) > date_started
 
                 if comment is not None and comment.author is not None and comment.id not in content and in_daily_thread and parent_comment: # and new:
-                    file = open("comments.txt", "a")
                     print(comment.id)
-                    file.write(comment.id + "\n")
-                    file.close()
-
                     flair = next(subreddit.flair(comment.author.name))["flair_text"]
 
                     if flair is None:
@@ -59,7 +54,7 @@ def read_comments():
 
                     emojis = set()
                     for character in comment.body:
-                        if character.encode('unicode-escape').decode('utf-8').startswith("\\U"):
+                        if character.encode('unicode-escape').decode('utf-8').lower().startswith("\\u"):
                             emojis.add(character)
 
                     highest_day = 0
@@ -67,53 +62,39 @@ def read_comments():
                     for emoji in emojis:
                         for x in range(0,len(partitions)): # scan through the flair's partitions
                             if emoji in partitions[x]:
-                                days = "0"
-                                for partition_character in partitions[x]:
-                                    if partition_character in "0123456789":
-                                        days += partition_character
-                                days = int(days)+1
+                                f = re.search("(\d+)", partitions[x])
+                                days = 0 if not f else int(f.group(1)) + 1
+
                                 if days > highest_day:
                                     highest_day = days
                                 partitions[x] = "{} {} Day(s)".format(emoji, days)
 
-                    flair = ""
-                    for partition in partitions:
-                        partition = partition.strip()
-                        flair += " | " + partition
-                    flair = flair[3:len(flair)] # Removes the first " | "
+                    partitions = [p.strip() for p in partitions]
+                    flair = " | ".join(partitions)
+                    
+                    log = ""
                     if old_flair != flair:
                         template_id = get_template_id(highest_day)
                         subreddit.flair.set(comment.author, flair, flair_template_id=template_id)
-                        print("Replaced {} with {} for {}.".format(old_flair, flair, comment.author.name).translate(non_bmp_map))
+                        log = "Replaced {} with {} for {}.".format(old_flair, flair, comment.author.name).translate(non_bmp_map)
                     else:
                         reply = comment.reply("Hey there! Looks like you're not using our standard flair format which means I can't log your days. Send me a PM [here](https://www.reddit.com/message/compose/?to=1000DOP-Bot&subject=flair) with the contents being the emoji and days you want as part of your flair and I'll fix that for you! Make sure you don't request a flair with more days than you've already logged. Example: '\U0001F3B5 12'\n\nI am a bot and this action was performed automatically. Please contact [my creator](https://www.reddit.com/message/compose/?to=Dan6erbond&subject=1000DOP-Bot) if you have any questions or concerns.")
-                        comment.mod.distinguish()
-                        print("Replied to {}.".format(comment.author.name))
+                        reply.mod.distinguish()
+                        log = "Replied to {}.".format(comment.author.name)
+                        
+                    with open("comments.txt", "a") as f:
+                        f.write(comment.id + "\n")
 
-        except Exception as e:
-            date_started = datetime.datetime.utcnow()
+                    print(log)
+                    with open("log.txt", "a+", encoding="utf8") as f:
+                        f.write(log + "\n")
+
+        except ValueError as e:
+            delta = datetime.utcnow() - date_started
+            t = 3 if delta.seconds > 5 else 10
+            date_started = datetime.utcnow()
             print("{}: {}".format(type(e), e))
-            sleep(3)
-        '''
-        except ConnectionError as e:
-            date_started = datetime.datetime.utcnow()
-            print("{}: {}".format(type(e), e)
-            sleep(30)
-        except HTTPError as e:
-            date_started = datetime.datetime.utcnow()
-            print("{}: {}".format(type(e), e)
-            sleep(30)
-        except praw.exceptions.PRAWException:
-            date_started = datetime.datetime.utcnow()
-            sleep(30)
-            full = traceback.format_exc()
-            logging.warning("PRAW Exception: %s" % full)
-        except prawcore.exceptions.PrawcoreException:
-            date_started = datetime.datetime.utcnow()
-            sleep(30)
-            full = traceback.format_exc()
-            logging.warning("PRAW Core Exception: %s" % full)
-        '''
+            sleep(t)
 
 def get_template_id(day):
     template_id = "109a0770-23e3-11e9-82ff-0ed95a9c69a0"
